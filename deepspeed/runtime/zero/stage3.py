@@ -554,7 +554,6 @@ class FP16_DeepSpeedZeroOptimizer_Stage3(object):
     def __init__(self,
                  module,
                  init_optimizer,
-                 fp16_enabled,
                  timers,
                  static_loss_scale=1.0,
                  dynamic_loss_scale=False,

@@ -89,7 +89,7 @@ def print_rank_msg(msg):
     print(f"rank {dist.get_rank()} - {msg}")
 
 
-class FP16_DeepSpeedZeroOptimizer(object):
+class DeepSpeedZeroOptimizer(object):
     """
     DeepSpeedZeroOptimizer designed to reduce the memory footprint
     required for training large deep learning models.
@@ -102,6 +102,7 @@ class FP16_DeepSpeedZeroOptimizer(object):
     """
     def __init__(self,
                  init_optimizer,
+                 fp16_enabled,
                  timers,
                  static_loss_scale=1.0,
                  dynamic_loss_scale=False,

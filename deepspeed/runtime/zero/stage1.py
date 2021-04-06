@@ -255,7 +255,8 @@ class DeepSpeedZeroOptimizer_Stage1(object):
                 if fp16_enabled:
                     fp32_sub_partition = sub_partition.clone().float().detach()  # fp16 -> fp32 copy
                 else:
-                    fp32_sub_partition = sub_partition  # or just fp32 -> fp32 reference
+                    fp32_sub_partition = sub_partition.detach()  # or just fp32 -> fp32 reference TODO: don't know
+                                                                 # I could use detach() here.
                 fp32_sub_partition.requires_grad = True
                 local_sub_partitions.append(fp32_sub_partition)
             self.local_sub_partitions_of_fp32_groups.append(local_sub_partitions)
@@ -286,6 +287,9 @@ class DeepSpeedZeroOptimizer_Stage1(object):
                 params_in_rank_sub_partitions_offsets)
 
         # we may have a way of fusing dynamic scale. Do not support for now
+        self.mpu = mpu
+        self.clip_grad = clip_grad
+
         if self.fp16_enabled:
             if dynamic_loss_scale:
                 if dynamic_loss_args is None:
@@ -304,8 +308,6 @@ class DeepSpeedZeroOptimizer_Stage1(object):
                                                   mpu=self.mpu,
                                                   zero_reduce_scatter=True)
 
-        self.mpu = mpu
-        self.clip_grad = clip_grad
 
         self.overflow = False
         self._initialize_optimizer_states()
@@ -681,7 +683,8 @@ class DeepSpeedZeroOptimizer_Stage1(object):
             local_sub_partitions_grad_groups.append(local_grad_sub_partitions)
 
         # RS: update unscale/clip with sub partitions
-        self.unscale_and_clip_grads(local_sub_partitions_grad_groups, norm_groups)
+        if self.fp16_enabled:
+            self.unscale_and_clip_grads(local_sub_partitions_grad_groups, norm_groups)
 
         self.optimizer.step()
 
@@ -748,7 +751,10 @@ class DeepSpeedZeroOptimizer_Stage1(object):
                 grad.data.mul_(1. / combined_scale)
 
     def backward(self, loss, retain_graph=False):
-        self.loss_scaler.backward(loss.float(), retain_graph=retain_graph)
+        if self.fp16_enabled:
+            self.loss_scaler.backward(loss.float(), retain_graph=retain_graph)
+        else:
+            loss.backward(retain_graph=retain_graph)
 
     def _update_scale(self, has_overflow=False):
         self.loss_scaler.update_scale(has_overflow)
